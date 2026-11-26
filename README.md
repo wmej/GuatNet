@@ -1,14 +1,8 @@
-# guatnet
+# GuatNet · 桂林航天工业学院网络认证工具
 
 Dr.COM（城市热点）校园网自动认证 + 断线保活，带托盘和图形界面。
 
 源码：<https://github.com/wmej/GuatNet>
-
-## 关于桂林航天工业学院
-
-桂林航天工业学院（Guilin University of Aerospace Technology，**GUAT**）位于广西桂林，是一所以工学为主、航天特色鲜明的公办全日制普通本科高校。学校前身是 1979 年创办的桂林航天工业高等专科学校，2012 年升格为本科并更名为现名。
-
-GuatNet 就是为该校校园网（Dr.COM eportal 认证）写的，名字取自 **GUAT** + **net**。其他同样使用 Dr.COM eportal 的学校，改一下网关 IP 和端口也能用。
 
 ## 界面
 
