@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.ico binary
+*.syso binary
+*.png binary
+*.exe binary

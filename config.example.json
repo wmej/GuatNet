@@ -1,0 +1,13 @@
+{
+  "account": "你的学号",
+  "password": "你的密码",
+  "isp": 0,
+  "gateway": "10.1.2.3",
+  "jsVersion": "4.2.1",
+  "probeURL": "http://connect.rom.miui.com/generate_204",
+  "probeIntervalSec": 20,
+  "probeTimeoutSec": 3,
+  "loginTimeoutSec": 5,
+  "failThreshold": 2,
+  "logFile": "guatnet.log"
+}

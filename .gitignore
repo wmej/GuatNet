@@ -1,0 +1,13 @@
+# 构建产物
+guatnet.exe
+*.exe
+dist/
+
+# 本地配置与日志（含账号密码，绝不提交）
+config.json
+*.log
+
+# 临时目录
+_preview/
+__pycache__/
+*.tmp
