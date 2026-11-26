@@ -136,8 +136,7 @@ schtasks /delete /tn "guatnet" /f
 编译：
 
 ```bash
-# 改图标后重新生成资源（可选）
-py -3.13 tools/makeicon.py
+# 若替换了 assets/icon.ico，重新生成 exe 图标资源
 rsrc -arch amd64 -ico assets/icon.ico -o rsrc_windows_amd64.syso
 
 go build -ldflags="-s -w -H=windowsgui" -o guatnet.exe .
