@@ -4,8 +4,6 @@ Dr.COM（城市热点）校园网自动认证 + 断线保活，带托盘和图�
 
 源码：<https://github.com/wmej/GuatNet>
 
-对照学长的 `GuatNetworkLogin` 重写，补了三件事：**断线检测、返回结果校验、日志脱敏**，外加一个界面。
-
 ## 界面
 
 主面板：
@@ -54,30 +52,19 @@ Dr.COM（城市热点）校园网自动认证 + 断线保活，带托盘和图�
 
 例外：如果 exe 同目录下**已经存在** `config.json`，程序当作便携模式，改用 exe 目录存放（方便调试）。
 
-## 和原版的区别
-
-| | 原版 | guatnet |
-|---|---|---|
-| 触发方式 | 每天固定时间试一次 | 每 20 秒探测，断网才登录 |
-| 掉线 | 不管 | 自动重连 |
-| 登录判定 | GET 成功就算成功 | 解析 `result` 字段，`1` 才算成功 |
-| 密码 | 启动时打进日志 | 永远 `***` |
-| 网关 | 硬编码 `10.1.2.3` | 界面里可改 |
-| 界面 | 无 | 托盘 + 无边框窗口 |
-
 ## 确认你校的网关地址
 
 程序默认 `10.1.2.3`，各校 Dr.COM 网关不一定相同。
 
-断开认证后，用浏览器打开任意 `http://` 网站，地址栏跳转到的 IP 就是网关：
+断开认证后，用浏览器打开任意 `http://` 网站，看地址栏跳转到哪里：
 
 ```
-http://10.1.2.3/drcom/login?callback=dr1003&DDDDD=...
+http://10.1.2.3:801/eportal/?c=Portal&a=login&...
 ```
 
-填到「设置 → 认证网关」里。
+其中的 IP（这里是 `10.1.2.3`）填到「设置 → 通用设置 → 认证网关」。端口默认 801，个别学校不同，改 `config.json` 的 `portalPort`。
 
-如果日志里出现 `404 URL no found`，说明地址不对。
+日志里出现「连不上认证门户」或「认证请求失败」，通常是网关 IP 或端口不对。
 
 ## 配置文件
 
@@ -85,17 +72,19 @@ http://10.1.2.3/drcom/login?callback=dr1003&DDDDD=...
 
 | 字段 | 说明 | 默认 |
 |---|---|---|
-| `account` | 学号/账号 | 空 |
-| `password` | 密码 | 空 |
-| `isp` | 0 校园网 1 电信 2 联通 3 移动 4 广电 | 0 |
-| `gateway` | 认证网关 IP | `10.1.2.3` |
-| `jsVersion` | 网关版本号，个别校区会校验 | `4.2.1` |
-| `probeURL` | 联网探测地址 | `http://connect.rom.miui.com/generate_204` |
-| `probeIntervalSec` | 探测间隔（秒） | 20 |
-| `probeTimeoutSec` | 探测超时（秒） | 3 |
-| `loginTimeoutSec` | 登录请求超时（秒） | 5 |
-| `failThreshold` | 连续失败几次才触发登录 | 2 |
-| `logFile` | 日志路径 | `guatnet.log` |
+| `account` | 学号 / 账号 | 空 |
+| `password` | 密码（只存本机） | 空 |
+| `isp` | 0 校园用户 · 1 校园电信 · 2 校园联通 · 3 校园其他 | `0` |
+| `gateway` | 认证门户 IP | `10.1.2.3` |
+| `portalPort` | 认证接口端口 | `801` |
+| `probeIntervalSec` | 多久问一次门户状态（秒） | `20` |
+| `probeTimeoutSec` | 查询门户超时（秒） | `5` |
+| `loginTimeoutSec` | 登录请求超时（秒） | `5` |
+| `windowWidth` / `windowHeight` | 窗口尺寸（逻辑像素） | `400` / `610` |
+| `firstRunDone` | 是否已确认过使用须知 | `false` |
+| `logFile` | 日志文件名 | `guatnet.log` |
+
+`jsVersion`、`probeURL`、`failThreshold` 三个字段已不再使用，仅为兼容旧配置保留，可以忽略。
 
 ## 开机自启
 
