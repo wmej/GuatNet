@@ -31,6 +31,8 @@ Dr.COM（城市热点）校园网自动认证 + 断线保活，带托盘和图�
 
 **方式一：安装包**（推荐，发给同学用这个）
 
+安装程序在 [Releases](https://github.com/wmej/GuatNet/releases) 页下载（`guatnet-setup.exe`，约 4.2 MB）。
+
 1. 双击 `guatnet-setup.exe`，一路下一步
 2. 附加任务：桌面快捷方式（可选）、**开机自启动（默认勾选）**
 3. 运行后在「设置」里填账号、密码、网关
