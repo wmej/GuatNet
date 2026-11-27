@@ -42,31 +42,35 @@ func ispSuffix(isp int) string {
 
 // clientIP 取门户眼中的本机 IP。
 //
-// 门户首页会内联 v4ip='x.x.x.x'，这是最准的来源；
-// 拿不到就退回到出口网卡的地址。
+// 只认门户首页内联的 v4ip='x.x.x.x'——那才是校园网给这个会话分配的地址。
+// 绝不退回到本机网卡地址：外网卡（比如家里的路由器）会被门户当成另一个会话，
+// 结果是认证"成功"了却上不了网，还会把已经在线的那条会话顶掉。
 func (c *DrcomClient) clientIP() string {
-	if resp, err := c.http.Get(fmt.Sprintf("http://%s/", c.cfg.Gateway)); err == nil {
-		if body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10)); err == nil {
-			resp.Body.Close()
-			if m := reV4IP.FindSubmatch(body); len(m) == 2 {
-				ip := strings.TrimSpace(string(m[1]))
-				if net.ParseIP(ip) != nil {
-					return ip
-				}
-			}
-		} else {
-			resp.Body.Close()
+	for i := 0; i < 3; i++ {
+		if ip := c.fetchV4IP(); ip != "" {
+			return ip
 		}
+		time.Sleep(300 * time.Millisecond)
 	}
+	return ""
+}
 
-	// 退路：本地发起一次连接，看出口地址
-	conn, err := net.DialTimeout("udp", fmt.Sprintf("%s:80", c.cfg.Gateway), 2*time.Second)
+func (c *DrcomClient) fetchV4IP() string {
+	resp, err := c.http.Get(fmt.Sprintf("http://%s/?_=%d", c.cfg.Gateway, time.Now().UnixNano()))
 	if err != nil {
 		return ""
 	}
-	defer conn.Close()
-	if addr, ok := conn.LocalAddr().(*net.UDPAddr); ok {
-		return addr.IP.String()
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	if err != nil {
+		return ""
+	}
+	if m := reV4IP.FindSubmatch(body); len(m) == 2 {
+		ip := strings.TrimSpace(string(m[1]))
+		if net.ParseIP(ip) != nil {
+			return ip
+		}
 	}
 	return ""
 }

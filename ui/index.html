@@ -41,7 +41,7 @@
   .iconbtn:hover{background:#F0F1F3;color:var(--ink)}
   .iconbtn svg{width:12px;height:12px}
 
-  main{flex:1 1 auto;display:flex;flex-direction:column;padding:14px;gap:11px;position:relative}
+  main{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;padding:14px;gap:11px;position:relative}
 
   /* 状态卡 */
   .status{
@@ -76,7 +76,7 @@
   .logtitle{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--gray);letter-spacing:.1em;margin-top:2px}
   .logtitle::after{content:"";flex:1;height:1px;background:var(--line)}
   .logs{
-    flex:1 1 auto;min-height:0;overflow-y:auto;border:1px solid var(--line);border-radius:6px;
+    flex:1 1 0;min-height:0;overflow-y:auto;border:1px solid var(--line);border-radius:6px;
     background:#FAFBFC;padding:8px 9px;
     font-family:Consolas,"Courier New",monospace;font-size:11px;line-height:1.9;color:#5A6470;
     user-select:text;-webkit-user-select:text;

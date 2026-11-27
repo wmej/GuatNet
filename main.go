@@ -12,6 +12,14 @@ import (
 const (
 	maxLoginTry = 6
 	maxBackoff  = 30 * time.Second
+
+	// 两次认证之间的最小间隔。校园门户对短时间内的重复登录会"强制注销"并冷却，
+	// 所以宁可慢一点，也不要连着重登。
+	minLoginGap = 45 * time.Second
+
+	// 认证成功后等门户生效：实测需要十几秒，期间探测不到不代表失败
+	verifyTries = 4
+	verifyGap   = 4 * time.Second
 )
 
 // App 把配置、状态、守护循环串在一起。
@@ -22,6 +30,8 @@ type App struct {
 	st    *AppState
 	force chan struct{}
 	log   *logger
+
+	lastLogin time.Time // 上次提交认证的时间，用于冷却判断
 }
 
 func (a *App) Config() Config {
@@ -120,7 +130,7 @@ func (a *App) daemon() {
 			fails = 0
 			a.st.setStatus(StatusOffline)
 			a.st.setError(pr.detail)
-			a.login(client, probe, cfg, pr.ip)
+			a.tryLogin(client, probe, cfg, pr.ip)
 			wasOnline = probe.online()
 			if wasOnline {
 				a.st.setStatus(StatusOnline)
@@ -148,7 +158,7 @@ func (a *App) daemon() {
 				a.st.setStatus(StatusOnline)
 				a.st.setError("")
 			case campusLoggedOut:
-				a.login(client, probe, cfg, cur.ip)
+				a.tryLogin(client, probe, cfg, cur.ip)
 				wasOnline = probe.online()
 				if wasOnline {
 					a.st.setStatus(StatusOnline)
@@ -165,6 +175,20 @@ func (a *App) daemon() {
 	}
 }
 
+// tryLogin 在冷却期外才真正提交认证，避免把门户惹毛。
+func (a *App) tryLogin(client *DrcomClient, probe *prober, cfg Config, ip string) {
+	if wait := minLoginGap - time.Since(a.lastLogin); wait > 0 {
+		// 只在冷却刚开始时记一条，避免每 20 秒刷一遍
+		if wait > minLoginGap-5*time.Second {
+			a.log.Warn("刚提交过认证，%s 内不重复提交（门户会强制注销并冷却）", minLoginGap)
+		}
+		a.st.setError("认证冷却中，请稍候")
+		return
+	}
+	a.lastLogin = time.Now()
+	a.login(client, probe, cfg, ip)
+}
+
 // login 带退避地认证，成功后复探确认。
 func (a *App) login(client *DrcomClient, probe *prober, cfg Config, ip string) {
 	backoff := 5 * time.Second
@@ -173,7 +197,11 @@ func (a *App) login(client *DrcomClient, probe *prober, cfg Config, ip string) {
 		ip = client.clientIP()
 	}
 	if ip == "" {
-		a.log.Warn("没取到本机在门户里的 IP，认证可能失败")
+		// 绝不能拿本机网卡地址凑数：门户会把它当成另一个会话，
+		// 结果是"认证成功"却上不了网，还会把在线的会话顶掉。
+		a.log.Error("取不到门户分配的本机 IP，本次不提交认证")
+		a.st.setError("取不到校园网分配的 IP")
+		return
 	}
 	a.log.Info("开始认证（%s）：%s", ip, client.maskedURL(ip))
 
@@ -189,13 +217,18 @@ func (a *App) login(client *DrcomClient, probe *prober, cfg Config, ip string) {
 		case res.OK:
 			a.log.Info("第 %d 次认证成功（result=%s）", i, res.Code)
 			a.st.addReconnect()
-			time.Sleep(2 * time.Second)
-			if probe.online() {
-				a.log.Info("复探通过，已在线")
-				return
+
+			// 门户返回成功后，会话生效需要一段时间，多探几轮再下结论
+			for k := 1; k <= verifyTries; k++ {
+				time.Sleep(verifyGap)
+				if probe.online() {
+					a.log.Info("复探通过，已在线（等待 %ds）", k*int(verifyGap/time.Second))
+					a.st.setError("")
+					return
+				}
 			}
-			a.log.Warn("网关返回成功，但仍无法上网")
-			a.st.setError("网关已接受，但仍无法上网")
+			a.log.Warn("门户已接受，但 %ds 内仍未生效，稍后再探", verifyTries*int(verifyGap/time.Second))
+			a.st.setError("门户已接受，等待生效")
 			return
 
 		default:
