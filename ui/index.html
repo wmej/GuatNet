@@ -120,6 +120,10 @@
   .field input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(47,111,237,.12)}
 
   /* 自定义下拉 */
+  .readonly{
+    height:34px;display:flex;align-items:center;padding:0 10px;border-radius:5px;
+    border:1px solid var(--line);background:var(--soft);color:#6B7480;font-size:12.5px;
+  }
   .sel{position:relative}
   .selbtn{
     width:100%;height:34px;display:flex;align-items:center;gap:8px;
@@ -302,7 +306,7 @@
           </button>
           <div class="selmenu" id="selIspMenu" hidden></div>
         </div>
-        <div class="hint">不确定就选「校园网」，大部分学生账号走这个；电信/联通宽带用户再选对应项。</div>
+        <div class="hint">按你宽带所属的运营商选，不确定就选「校园网」。这项会以 R3 参数提交给门户。</div>
       </div>
     </div>
 
@@ -331,7 +335,7 @@
         </span>
         <div>
           <div class="nm">GuatNet</div>
-          <div class="ver">版本 1.0.2 · 校园网自动认证</div>
+          <div class="ver">版本 1.0.3 · 校园网自动认证</div>
         </div>
       </div>
 
@@ -439,7 +443,7 @@ $('btnSet').onclick = () => openSheet();
 $('btnBack').onclick = $('btnCancel').onclick = () => closeSheet();
 
 /* ---------- 运营商下拉 ---------- */
-const ISP_NAMES = ['校园网', '校园电信', '校园联通', '校园其他'];
+const ISP_NAMES = ['校园网', '中国电信', '中国联通', '中国移动', '中国广电'];
 let currentIsp = 0;
 
 (function buildIsp(){
@@ -459,26 +463,12 @@ function setIsp(v){
   $('selIspText').textContent = ISP_NAMES[currentIsp] || ISP_NAMES[0];
   [...$('selIspMenu').children].forEach(b => b.classList.toggle('on', Number(b.dataset.v) === currentIsp));
 }
+function openIsp(){ $('selIsp').classList.add('open'); $('selIspMenu').hidden = false; }
+function closeIsp(){ $('selIsp').classList.remove('open'); $('selIspMenu').hidden = true; }
 
-function openIsp(){
-  $('selIsp').classList.add('open');
-  $('selIspMenu').hidden = false;
-}
-function closeIsp(){
-  $('selIsp').classList.remove('open');
-  $('selIspMenu').hidden = true;
-}
-
-$('selIspBtn').onclick = e => {
-  e.stopPropagation();
-  $('selIspMenu').hidden ? openIsp() : closeIsp();
-};
-document.addEventListener('click', e => {
-  if (!e.target.closest('#selIsp')) closeIsp();
-});
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeIsp();
-});
+$('selIspBtn').onclick = e => { e.stopPropagation(); $('selIspMenu').hidden ? openIsp() : closeIsp(); };
+document.addEventListener('click', e => { if (!e.target.closest('#selIsp')) closeIsp(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeIsp(); });
 
 /* ---------- 设置分类 ---------- */
 function switchTab(name){
@@ -517,11 +507,11 @@ function openSheet(){
   const s = JSON.parse(_lastState || '{}');
   $('fAccount').value = s.account || '';
   $('fGateway').value = s.gateway || '';
-  setIsp(s.isp ?? 0);
   setAutoStart(s.autoStart);
   switchTab('account');
   $('fPassword').value = '';
   $('fPassword').placeholder = s.hasPassword ? '已保存，留空则不修改' : '请输入密码';
+  setIsp(s.isp ?? 0);
   $('msg').textContent = '';
   $('sheet').classList.add('open');
   sheetOpen = true;
@@ -535,9 +525,9 @@ $('btnSave').onclick = async () => {
   const payload = {
     account: $('fAccount').value.trim(),
     password: $('fPassword').value,
-    isp: currentIsp,
     autoStart: autoStartOn,
-    gateway: $('fGateway').value.trim()
+    gateway: $('fGateway').value.trim(),
+    isp: currentIsp
   };
   try {
     const err = await app.save(JSON.stringify(payload));

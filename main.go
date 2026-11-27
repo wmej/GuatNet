@@ -130,7 +130,7 @@ func (a *App) daemon() {
 			fails = 0
 			a.st.setStatus(StatusOffline)
 			a.st.setError(pr.detail)
-			a.tryLogin(client, probe, cfg, pr.ip)
+			a.tryLogin(client, probe, cfg)
 			wasOnline = probe.online()
 			if wasOnline {
 				a.st.setStatus(StatusOnline)
@@ -154,11 +154,18 @@ func (a *App) daemon() {
 			cur := probe.check()
 			switch cur.state {
 			case campusLoggedIn:
-				a.log.Info("当前已认证，无需重复登录")
-				a.st.setStatus(StatusOnline)
-				a.st.setError("")
+				// 用户主动点了重连，就真的重来一次（会替换掉现有会话）
+				a.log.Info("按要求重新认证（当前已在线，旧会话会被替换）")
+				a.tryLogin(client, probe, cfg)
+				wasOnline = probe.online()
+				if wasOnline {
+					a.st.setStatus(StatusOnline)
+					a.st.setError("")
+				} else {
+					a.st.setStatus(StatusOffline)
+				}
 			case campusLoggedOut:
-				a.tryLogin(client, probe, cfg, cur.ip)
+				a.tryLogin(client, probe, cfg)
 				wasOnline = probe.online()
 				if wasOnline {
 					a.st.setStatus(StatusOnline)
@@ -175,8 +182,17 @@ func (a *App) daemon() {
 	}
 }
 
+// operatorName 把 R3 编号翻成给人看的名字。
+func operatorName(isp int) string {
+	names := []string{"校园网", "中国电信", "中国联通", "中国移动", "中国广电"}
+	if isp >= 0 && isp < len(names) {
+		return names[isp]
+	}
+	return "校园网"
+}
+
 // tryLogin 在冷却期外才真正提交认证，避免把门户惹毛。
-func (a *App) tryLogin(client *DrcomClient, probe *prober, cfg Config, ip string) {
+func (a *App) tryLogin(client *DrcomClient, probe *prober, cfg Config) {
 	if wait := minLoginGap - time.Since(a.lastLogin); wait > 0 {
 		// 只在冷却刚开始时记一条，避免每 20 秒刷一遍
 		if wait > minLoginGap-5*time.Second {
@@ -186,29 +202,19 @@ func (a *App) tryLogin(client *DrcomClient, probe *prober, cfg Config, ip string
 		return
 	}
 	a.lastLogin = time.Now()
-	a.login(client, probe, cfg, ip)
+	a.login(client, probe, cfg)
 }
 
 // login 带退避地认证，成功后复探确认。
-func (a *App) login(client *DrcomClient, probe *prober, cfg Config, ip string) {
+func (a *App) login(client *DrcomClient, probe *prober, cfg Config) {
 	backoff := 5 * time.Second
 
-	if ip == "" {
-		ip = client.clientIP()
-	}
-	if ip == "" {
-		// 绝不能拿本机网卡地址凑数：门户会把它当成另一个会话，
-		// 结果是"认证成功"却上不了网，还会把在线的会话顶掉。
-		a.log.Error("取不到门户分配的本机 IP，本次不提交认证")
-		a.st.setError("取不到校园网分配的 IP")
-		return
-	}
-	a.log.Info("开始认证（%s）：%s", ip, client.maskedURL(ip))
+	a.log.Info("开始认证（%s）：%s", operatorName(cfg.ISP), client.maskedURL())
 
 	for i := 1; i <= maxLoginTry; i++ {
 		a.st.setStatus(StatusAuthing)
 
-		res, err := client.Login(ip)
+		res, err := client.Login()
 		switch {
 		case err != nil:
 			a.log.Error("第 %d 次认证请求失败：%v", i, err)
