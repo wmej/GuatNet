@@ -297,12 +297,12 @@
       <div class="field"><label>运营商</label>
         <div class="sel" id="selIsp">
           <button type="button" class="selbtn" id="selIspBtn">
-            <span id="selIspText">校园用户</span>
+            <span id="selIspText">校园网</span>
             <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4.5L6 7.5L9 4.5"/></svg>
           </button>
           <div class="selmenu" id="selIspMenu" hidden></div>
         </div>
-        <div class="hint">不确定就选「校园用户」，大部分学生账号走这个；电信/联通宽带用户再选对应项。</div>
+        <div class="hint">不确定就选「校园网」，大部分学生账号走这个；电信/联通宽带用户再选对应项。</div>
       </div>
     </div>
 
@@ -331,7 +331,7 @@
         </span>
         <div>
           <div class="nm">GuatNet</div>
-          <div class="ver">版本 1.0.1 · 校园网自动认证</div>
+          <div class="ver">版本 1.0.2 · 校园网自动认证</div>
         </div>
       </div>
 
@@ -439,7 +439,7 @@ $('btnSet').onclick = () => openSheet();
 $('btnBack').onclick = $('btnCancel').onclick = () => closeSheet();
 
 /* ---------- 运营商下拉 ---------- */
-const ISP_NAMES = ['校园用户', '校园电信', '校园联通', '校园其他'];
+const ISP_NAMES = ['校园网', '校园电信', '校园联通', '校园其他'];
 let currentIsp = 0;
 
 (function buildIsp(){
