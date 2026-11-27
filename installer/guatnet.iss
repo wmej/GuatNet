@@ -17,7 +17,7 @@ DisableProgramGroupPage=yes
 ; 按用户安装，不弹 UAC，装到 %LOCALAPPDATA%\Programs
 PrivilegesRequired=lowest
 OutputDir=..\dist
-OutputBaseFilename=guatnet-setup
+OutputBaseFilename=GuatNet-v{#MyAppVersion}-win-x64-setup
 SetupIconFile=..\assets\icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2/max

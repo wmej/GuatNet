@@ -29,9 +29,12 @@ Dr.COM（城市热点）校园网自动认证 + 断线保活，带托盘和图�
 
 **方式一：安装包**（推荐，发给同学用这个）
 
-安装程序在 [Releases](https://github.com/wmej/GuatNet/releases) 页下载（`guatnet-setup.exe`，约 4.2 MB）。
+安装程序在 [Releases](https://github.com/wmej/GuatNet/releases) 页下载：
 
-1. 双击 `guatnet-setup.exe`，一路下一步
+- `GuatNet-v<版本>-win-x64-setup.exe` —— 安装版
+- `GuatNet-v<版本>-win-x64-portable.exe` —— 绿色版
+
+1. 双击 `GuatNet-v<版本>-win-x64-setup.exe`，一路下一步
 2. 附加任务：桌面快捷方式（可选）、**开机自启动（默认勾选）**
 3. 运行后在「设置」里填账号、密码、网关
 
@@ -137,11 +140,11 @@ ISCC.exe installer\guatnet.iss
 ```
 
 `-H=windowsgui` 让程序不弹黑色控制台窗口；`rsrc_windows_amd64.syso` 提供 exe 图标。
-安装包输出到 `dist\guatnet-setup.exe`。
+安装包输出到 `dist\GuatNet-v<版本>-win-x64-setup.exe`。
 
 ## 分发
 
-发 `dist\guatnet-setup.exe` 一个文件就行（约 4.3 MB）。
+发 `dist\GuatNet-v<版本>-win-x64-setup.exe` 一个文件就行（约 4.2 MB）。
 
 不想装安装包的话，单独发 `guatnet.exe` 也能用——界面和图标都嵌在 exe 里，不用附带 `ui/`、`assets/`。
 
