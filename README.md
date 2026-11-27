@@ -1,18 +1,15 @@
-# GuatNet · 桂林航天工业学院网络认证工具
+# 桂航校园网自动认证程序
 
-Dr.COM（城市热点）校园网自动认证 + 断线保活，带托盘和图形界面。
+英文名 **GuatNet**（仓库同名）。Dr.COM（城市热点）校园网自动认证 + 断线保活，带托盘和图形界面。
 
 源码：<https://github.com/wmej/GuatNet>
 
 ## 界面
 
-主面板：
-
-![主界面](docs/screenshot-main.png)
-
-设置：
-
-![设置面板](docs/screenshot-settings.png)
+<p align="center">
+  <img src="docs/screenshot-main.png" width="330" alt="主界面">
+  <img src="docs/screenshot-settings.png" width="330" alt="设置面板">
+</p>
 
 - 无边框窗口，标题栏（含状态卡区域）可拖动
 - 右上角 `−` **最小化到任务栏**，`×` **收到托盘**
