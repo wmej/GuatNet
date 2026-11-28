@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 打包与发布
 
-- **打包、上传 Release、发布新版本前，先问我「要不要打包上传？」，确认后再执行**
-- 不要自作主张跑 `ISCC`、创建 Release 或上传附件
+- **推送必须同时发布 Release**，一次动作整套走完：推 `main` → 打 `v<版本>` tag 并推送 → 创建 GitHub Release → 上传资产
+- 发布资产固定两个：`GuatNet-v<版本>-win-x64-setup.exe` 和 `GuatNet-v<版本>-win-x64-portable.exe`（绿色版就是 `guatnet.exe` 改名）
+- 不要自行决定推送；用户要求推送时再执行，但发布必须跟着推送一起做完
 - 改代码时只做编译验证：`go build -o /tmp/check.exe .`
 
 ## 版本号
@@ -23,6 +24,7 @@ go build -ldflags="-s -w -H=windowsgui" -o guatnet.exe .
 ISCC.exe installer\guatnet.iss        # 输出到 dist\
 ```
 
+- ISCC 不在 PATH，实际路径：`%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`
 - 替换 `assets/icon.ico` 后需重生成图标资源：
   `rsrc -arch amd64 -ico assets/icon.ico -o rsrc_windows_amd64.syso`
 - `ui/index.html` 和 `assets/icon.ico` 通过 `go:embed` 编进 exe，改完必须重新 `go build` 才生效
