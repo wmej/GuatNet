@@ -91,6 +91,7 @@ ISCC.exe installer\guatnet.iss        # 输出到 dist\
 
 - `enableDPIAwareness()` 必须在**任何窗口创建之前**调用，否则高分屏上界面被系统拉伸、字发虚
 - 窗口去掉系统标题栏/边框，拖动靠 `dragWindow()` 发 `WM_NCLBUTTONDOWN` 伪装成按标题栏
+- 托盘退出先 `shutdownUI()` 让界面线程销毁 WebView（2 秒兜底），再关日志、`os.Exit`
 - 尺寸换算：配置里是逻辑像素，`CreateWindowEx` 要物理像素，按 `systemDPI()/96` 乘缩放比
 
 ## 注意事项

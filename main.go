@@ -349,8 +349,10 @@ func (a *App) applyFirstRun() string {
 
 // ---------------- 托盘 ----------------
 
-// quitApp 先落盘日志再退出：os.Exit 不会执行 main 里的 defer。
+// quitApp 先拆掉 WebView2、落盘日志，再退出进程。
+// os.Exit 不会执行 main 里的 defer，所以这里手动收尾。
 func (a *App) quitApp() {
+	shutdownUI(2 * time.Second)
 	if a.log != nil {
 		_ = a.log.Close()
 	}

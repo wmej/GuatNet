@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jchv/go-webview2"
 )
@@ -21,6 +22,8 @@ var trayIcon []byte
 var (
 	uiMu   sync.Mutex
 	uiHwnd uintptr
+	uiView webview2.WebView
+	uiDone = make(chan struct{})
 )
 
 func showMainWindow() {
@@ -45,6 +48,7 @@ func hideMainWindow() {
 // 窗口、消息循环必须同线程，所以这里锁线程。
 func runUI(a *App) {
 	runtime.LockOSThread()
+	defer close(uiDone)
 
 	// 配置里存的是逻辑尺寸，CreateWindowEx 要物理像素，按系统 DPI 换算
 	cfg := a.Config()
@@ -80,6 +84,7 @@ func runUI(a *App) {
 	hwnd := uintptr(w.Window())
 	uiMu.Lock()
 	uiHwnd = hwnd
+	uiView = w
 	uiMu.Unlock()
 
 	makeBorderless(hwnd)
@@ -125,10 +130,33 @@ func runUI(a *App) {
 		return "", nil
 	})
 	_ = w.Bind("quit", func() (string, error) {
-		a.quitApp()
+		// 回调跑在界面线程上，quitApp 要等 Run 返回，必须换到别的线程
+		go a.quitApp()
 		return "", nil
 	})
 
 	w.SetHtml(strings.ReplaceAll(indexHTML, "{{VERSION}}", appVersion))
 	w.Run()
+
+	uiMu.Lock()
+	uiView = nil
+	uiMu.Unlock()
+}
+
+// shutdownUI 让界面线程销毁 WebView 并等它退出，最多等 timeout。
+// 这样退出进程前先正常拆掉窗口和 WebView2，而不是直接 os.Exit。
+func shutdownUI(timeout time.Duration) {
+	uiMu.Lock()
+	w := uiView
+	uiMu.Unlock()
+	if w == nil {
+		return
+	}
+
+	w.Destroy() // 只是投递 WM_CLOSE，真正的销毁在界面线程完成
+
+	select {
+	case <-uiDone:
+	case <-time.After(timeout):
+	}
 }
