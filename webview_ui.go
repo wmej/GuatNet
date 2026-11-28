@@ -5,7 +5,6 @@ package main
 import (
 	_ "embed"
 	"encoding/json"
-	"os"
 	"runtime"
 	"sync"
 
@@ -117,7 +116,7 @@ func runUI(a *App) {
 		return "", nil
 	})
 	_ = w.Bind("quit", func() (string, error) {
-		os.Exit(0)
+		a.quitApp()
 		return "", nil
 	})
 

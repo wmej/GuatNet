@@ -13,7 +13,12 @@ const (
 	StatusOnline  Status = "online"
 )
 
-const maxLogLines = 200
+const (
+	maxLogLines = 200
+
+	// 开机自启状态要查注册表，界面每秒拉一次快照，缓存几秒足够。
+	autoStartTTL = 5 * time.Second
+)
 
 // AppState 是守护线程和界面线程之间唯一共享的状态。
 // 所有字段都在锁内读写；界面只拿快照。
@@ -24,6 +29,9 @@ type AppState struct {
 	reconnects  int
 	lastError   string
 	logs        []string
+
+	autoStart   bool
+	autoStartAt time.Time
 }
 
 func newAppState() *AppState {
@@ -56,6 +64,33 @@ func (s *AppState) addReconnect() {
 	s.mu.Unlock()
 }
 
+// autoStartCached 最多每 autoStartTTL 查一次注册表，避免界面轮询把它变成 1 Hz 查询。
+func (s *AppState) autoStartCached() bool {
+	s.mu.Lock()
+	if !s.autoStartAt.IsZero() && time.Since(s.autoStartAt) < autoStartTTL {
+		v := s.autoStart
+		s.mu.Unlock()
+		return v
+	}
+	s.mu.Unlock()
+
+	v := autoStartEnabled() // 注册表调用放在锁外
+
+	s.mu.Lock()
+	s.autoStart = v
+	s.autoStartAt = time.Now()
+	s.mu.Unlock()
+	return v
+}
+
+// setAutoStartCache 在界面刚改过开机自启后立刻同步，别让界面看到旧值。
+func (s *AppState) setAutoStartCache(on bool) {
+	s.mu.Lock()
+	s.autoStart = on
+	s.autoStartAt = time.Now()
+	s.mu.Unlock()
+}
+
 func (s *AppState) addLog(line string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -82,7 +117,7 @@ type uiState struct {
 }
 
 func (s *AppState) snapshot(cfg Config) uiState {
-	auto := autoStartEnabled() // 查注册表，别放在锁里
+	auto := s.autoStartCached()
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

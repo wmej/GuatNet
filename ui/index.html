@@ -335,7 +335,7 @@
         </span>
         <div>
           <div class="nm">GuatNet</div>
-          <div class="ver">版本 1.0.4 · 校园网自动认证</div>
+          <div class="ver">版本 1.0.5 · 校园网自动认证</div>
         </div>
       </div>
 
@@ -353,7 +353,7 @@
 
       <div class="about-sec">
         <b>实现原理</b>
-        <p>按 Dr.COM eportal 认证接口实现：带上账号、密码和本机在校园网里的 IP，向门户提交一次登录，再解析返回的 <code>result</code> 字段判断成败。<br>
+        <p>按经典 Dr.COM 认证接口实现：向门户的 <code>/drcom/login</code> 提交账号、密码和运营商编号，再解析返回的 <code>result</code> 字段判断成败。<br>
         程序在此协议之上补了断线检测、返回结果校验和日志脱敏，具体实现见项目源码。</p>
         <button type="button" class="linkbtn" id="btnRepo">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 3H3.5v9.5H13V9.5M9.5 3H13v3.5M13 3L7.5 8.5"/></svg>

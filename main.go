@@ -65,7 +65,12 @@ func main() {
 
 	cfgPath := configFilePath()
 	cfg, err := loadConfig(cfgPath)
+	brokenBackup := ""
 	if err != nil {
+		// 解析失败时先留一份底，否则下次保存会把用户的账号彻底覆盖
+		if p, berr := backupConfigFile(cfgPath); berr == nil {
+			brokenBackup = p
+		}
 		cfg = defaultConfig()
 	}
 
@@ -81,6 +86,9 @@ func main() {
 	a.log = log
 	defer log.Close()
 
+	if brokenBackup != "" {
+		a.log.Warn("配置文件无法解析，已备份为 %s，本次使用默认配置", brokenBackup)
+	}
 	a.log.Info("GuatNet 启动｜网关 %s｜ISP %d", cfg.Gateway, cfg.ISP)
 	if cfg.Account == "" {
 		a.log.Warn("还没有配置账号，请在「设置」里填写")
@@ -311,10 +319,11 @@ func (a *App) saveFromUI(payload string) string {
 		if err := setAutoStart(*in.AutoStart); err != nil {
 			return "设置开机自启失败：" + err.Error()
 		}
+		a.st.setAutoStartCache(*in.AutoStart)
 	}
 
 	a.setConfig(cfg)
-	a.log.Info("配置已更新｜账号 %s｜网关 %s｜ISP %d", cfg.Account, cfg.Gateway, cfg.ISP)
+	a.log.Info("配置已更新｜网关 %s｜ISP %d", cfg.Gateway, cfg.ISP)
 
 	// 配置变了，立刻重新认证一次
 	a.Force()
@@ -337,6 +346,14 @@ func (a *App) applyFirstRun() string {
 
 // ---------------- 托盘 ----------------
 
+// quitApp 先落盘日志再退出：os.Exit 不会执行 main 里的 defer。
+func (a *App) quitApp() {
+	if a.log != nil {
+		_ = a.log.Close()
+	}
+	os.Exit(0)
+}
+
 func (a *App) onTrayReady() {
 	systray.SetIcon(trayIcon)
 	systray.SetTitle("GuatNet")
@@ -354,6 +371,6 @@ func (a *App) onTrayReady() {
 	mReconnect.Click(func() { a.Force() })
 	mQuit.Click(func() {
 		systray.Quit()
-		os.Exit(0)
+		a.quitApp()
 	})
 }

@@ -77,7 +77,7 @@ func (p *prober) check() probeResult {
 	switch {
 	case uid != "":
 		r.state = campusLoggedIn
-		r.detail = "已认证（账号 " + uid + "）"
+		r.detail = "已认证" // 不把 uid（学号）写进日志
 	case isLogoutPage(page):
 		// 有些版本不返回 uid，但页面是注销页，说明也是在线
 		r.state = campusLoggedIn

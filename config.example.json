@@ -3,11 +3,10 @@
   "password": "你的密码",
   "isp": 0,
   "gateway": "10.1.2.3",
-  "jsVersion": "4.2.1",
-  "probeURL": "http://connect.rom.miui.com/generate_204",
   "probeIntervalSec": 20,
-  "probeTimeoutSec": 3,
+  "probeTimeoutSec": 5,
   "loginTimeoutSec": 5,
-  "failThreshold": 2,
-  "logFile": "guatnet.log"
+  "logFile": "guatnet.log",
+  "windowWidth": 400,
+  "windowHeight": 610
 }

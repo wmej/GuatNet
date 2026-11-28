@@ -8,6 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **推送必须同时发布 Release**，一次动作整套走完：推 `main` → 打 `v<版本>` tag 并推送 → 创建 GitHub Release → 上传资产
 - 发布资产固定两个：`GuatNet-v<版本>-win-x64-setup.exe` 和 `GuatNet-v<版本>-win-x64-portable.exe`（绿色版就是 `guatnet.exe` 改名）
+- Release 说明沿用 v1.0.3 的六段式模板：程序简介 → `## 下载哪一个？`（安装版/绿色版对照表）→ `## 本次更新（vX）` → `## 功能` → `## 环境要求` → 非官方声明；只改版本号与更新内容
 - 不要自行决定推送；用户要求推送时再执行，但发布必须跟着推送一起做完
 - 改代码时只做编译验证：`go build -o /tmp/check.exe .`
 
@@ -79,7 +80,7 @@ ISCC.exe installer\guatnet.iss        # 输出到 dist\
   - **便携模式**：exe 同目录已存在 `config.json` → 配置和日志都放 exe 目录（绿色版/调试）
   - **安装模式**：否则写 `%APPDATA%\guatnet\`（`Program Files` 只读）
 - 保存用 `.tmp` + rename 原子写入；`normalize()` 负责补默认值
-- `jsVersion` / `probeURL` / `failThreshold` 已废弃，仅为兼容旧配置保留，不要再扩展或依赖
+- `jsVersion` / `probeURL` / `failThreshold` / `portalPort` 已废弃，仅为兼容旧配置保留，不要再扩展或依赖；认证固定走 80 端口 `/drcom/login`
 - 开机自启写 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`；`autoStartEnabled()` 会把注册表值和当前 exe 路径比对，换了安装位置就视为未启用
 
 ### Windows 细节（`win32.go`）

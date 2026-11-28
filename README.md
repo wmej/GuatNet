@@ -62,7 +62,7 @@
 http://10.1.2.3:801/eportal/?c=Portal&a=login&...
 ```
 
-其中的 IP（这里是 `10.1.2.3`）填到「设置 → 通用设置 → 认证网关」。端口默认 801，个别学校不同，改 `config.json` 的 `portalPort`。
+其中的 IP（这里是 `10.1.2.3`）填到「设置 → 通用设置 → 认证网关」。认证请求走 80 端口的 `/drcom/login`，不需要填端口。
 
 日志里出现「连不上认证门户」或「认证请求失败」，通常是网关 IP 或端口不对。
 
@@ -76,7 +76,6 @@ http://10.1.2.3:801/eportal/?c=Portal&a=login&...
 | `password` | 密码（只存本机） | 空 |
 | `isp` | 运营商：0 校园网 · 1 中国电信 · 2 中国联通 · 3 中国移动 · 4 中国广电（以 `R3` 参数提交） | `0` |
 | `gateway` | 认证门户 IP | `10.1.2.3` |
-| `portalPort` | 认证接口端口 | `801` |
 | `probeIntervalSec` | 多久问一次门户状态（秒） | `20` |
 | `probeTimeoutSec` | 查询门户超时（秒） | `5` |
 | `loginTimeoutSec` | 登录请求超时（秒） | `5` |
@@ -84,7 +83,7 @@ http://10.1.2.3:801/eportal/?c=Portal&a=login&...
 | `firstRunDone` | 是否已确认过使用须知 | `false` |
 | `logFile` | 日志文件名 | `guatnet.log` |
 
-`jsVersion`、`probeURL`、`failThreshold` 三个字段已不再使用，仅为兼容旧配置保留，可以忽略。
+`jsVersion`、`probeURL`、`failThreshold`、`portalPort` 四个字段已不再使用，仅为兼容旧配置保留，可以忽略。
 
 ## 开机自启
 
@@ -134,6 +133,9 @@ go build -ldflags="-s -w -H=windowsgui" -o guatnet.exe .
 
 # 打安装包（需要 Inno Setup 6）
 ISCC.exe installer\guatnet.iss
+
+# 绿色版：安装包打完后，复制 exe 并按版本命名
+cp guatnet.exe "dist/GuatNet-v<版本>-win-x64-portable.exe"
 ```
 
 `-H=windowsgui` 让程序不弹黑色控制台窗口；`rsrc_windows_amd64.syso` 提供 exe 图标。

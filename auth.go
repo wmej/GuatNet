@@ -9,10 +9,10 @@ import (
 	"time"
 )
 
-// DrcomClient 对接 Dr.COM eportal（v3 接口）。
+// DrcomClient 对接经典 Dr.COM 认证接口。
 //
-// 桂林航天工业学院的门户在 http://10.1.2.3:801，
-// 登录走 GET /eportal/portal/login，返回 JSONP：dr1003({"result":..,"msg":".."})
+// 桂林航天工业学院的门户在 http://10.1.2.3（80 端口），
+// 登录走 GET /drcom/login，返回 JSONP：dr1003({"result":..,"msg":".."})。
 type DrcomClient struct {
 	cfg  Config
 	http *http.Client

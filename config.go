@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // Config 是全部可调参数，来自程序同目录的 config.json。
@@ -18,7 +19,8 @@ type Config struct {
 
 	JSVersion string `json:"jsVersion"` // 部分校区会校验这个版本号
 
-	PortalPort int `json:"portalPort"` // 认证接口端口，桂林航天工业学院是 801
+	// 已废弃：登录固定走 80 端口的经典 Dr.COM 接口，保留字段只为兼容旧配置。
+	PortalPort int `json:"portalPort,omitempty"`
 
 	ProbeURL        string `json:"probeURL"`
 	ProbeEverySec   int    `json:"probeIntervalSec"`
@@ -41,7 +43,6 @@ func defaultConfig() Config {
 		ISP:             0,
 		Gateway:         "10.1.2.3",
 		JSVersion:       "4.2.1",
-		PortalPort:      801,
 		ProbeURL:        "http://connect.rom.miui.com/generate_204",
 		ProbeEverySec:   20,
 		ProbeTimeoutSec: 5,
@@ -114,9 +115,6 @@ func normalize(c Config) Config {
 	if c.JSVersion == "" {
 		c.JSVersion = d.JSVersion
 	}
-	if c.PortalPort <= 0 {
-		c.PortalPort = d.PortalPort
-	}
 	if c.ProbeURL == "" {
 		c.ProbeURL = d.ProbeURL
 	}
@@ -142,6 +140,21 @@ func normalize(c Config) Config {
 		c.WindowH = d.WindowH
 	}
 	return c
+}
+
+// backupConfigFile 把损坏的配置复制一份。
+// 不清空原文件：原文件还在，便携模式判定不会被破坏；
+// 而下次保存会覆盖它，所以必须先留一份底。
+func backupConfigFile(path string) (string, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	dst := path + ".broken-" + time.Now().Format("20060102-150405")
+	if err := os.WriteFile(dst, b, 0o600); err != nil {
+		return "", err
+	}
+	return dst, nil
 }
 
 // saveConfig 原子写入，避免写到一半断电把配置写坏。
