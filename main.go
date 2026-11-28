@@ -58,6 +58,11 @@ func main() {
 	// 必须最先调用：否则高分屏上整个界面会被系统拉伸，字发虚
 	enableDPIAwareness()
 
+	// 双开会让两个守护线程互相顶掉会话，先挡掉
+	if !ensureSingleInstance() {
+		return
+	}
+
 	cfgPath := configFilePath()
 	cfg, err := loadConfig(cfgPath)
 	if err != nil {
@@ -140,42 +145,50 @@ func (a *App) daemon() {
 			}
 
 		default: // campusUnreachable
-			if wasOnline || fails == 0 {
+			fails++
+			// 只在刚掉线时记一条：一直连不上就不再每 20 秒刷屏
+			if wasOnline || fails == 1 {
 				a.log.Info("%s", pr.detail)
 			}
 			wasOnline = false
-			fails = 0
 			a.st.setStatus(StatusOffline)
 			a.st.setError(pr.detail)
 		}
 
 		select {
 		case <-a.force:
+			// 配置可能刚在设置里保存过，重建客户端，
+			// 否则会拿旧账号/旧网关去认证
+			cfg = a.Config()
+			client = newDrcomClient(cfg)
+			probe = newProber(cfg)
+
 			cur := probe.check()
-			switch cur.state {
-			case campusLoggedIn:
-				// 用户主动点了重连，就真的重来一次（会替换掉现有会话）
-				a.log.Info("按要求重新认证（当前已在线，旧会话会被替换）")
-				a.tryLogin(client, probe, cfg)
-				wasOnline = probe.online()
-				if wasOnline {
-					a.st.setStatus(StatusOnline)
-					a.st.setError("")
-				} else {
-					a.st.setStatus(StatusOffline)
-				}
-			case campusLoggedOut:
-				a.tryLogin(client, probe, cfg)
-				wasOnline = probe.online()
-				if wasOnline {
-					a.st.setStatus(StatusOnline)
-					a.st.setError("")
-				} else {
-					a.st.setStatus(StatusOffline)
-				}
-			default:
+			wait := a.cooldownRemaining()
+			switch {
+			case cur.state == campusUnreachable:
 				a.log.Warn("%s，跳过认证", cur.detail)
 				a.st.setError(cur.detail)
+
+			case wait > 0:
+				// 用户点了重连，但冷却中：如实说明还要等多久，别假装认证过
+				a.log.Warn("刚提交过认证，%d 秒内不重复提交（门户会强制注销并冷却）",
+					int(wait/time.Second)+1)
+				a.st.setError("认证冷却中，请稍候")
+
+			default:
+				if cur.state == campusLoggedIn {
+					// 用户主动点了重连，就真的重来一次（会替换掉现有会话）
+					a.log.Info("按要求重新认证（当前已在线，旧会话会被替换）")
+				}
+				a.tryLogin(client, probe, cfg)
+				wasOnline = probe.online()
+				if wasOnline {
+					a.st.setStatus(StatusOnline)
+					a.st.setError("")
+				} else {
+					a.st.setStatus(StatusOffline)
+				}
 			}
 		case <-time.After(time.Duration(cfg.ProbeEverySec) * time.Second):
 		}
@@ -191,9 +204,17 @@ func operatorName(isp int) string {
 	return "校园网"
 }
 
+// cooldownRemaining 返回距离允许下次提交还要等多久，0 表示可以提交。
+func (a *App) cooldownRemaining() time.Duration {
+	if wait := minLoginGap - time.Since(a.lastLogin); wait > 0 {
+		return wait
+	}
+	return 0
+}
+
 // tryLogin 在冷却期外才真正提交认证，避免把门户惹毛。
 func (a *App) tryLogin(client *DrcomClient, probe *prober, cfg Config) {
-	if wait := minLoginGap - time.Since(a.lastLogin); wait > 0 {
+	if wait := a.cooldownRemaining(); wait > 0 {
 		// 只在冷却刚开始时记一条，避免每 20 秒刷一遍
 		if wait > minLoginGap-5*time.Second {
 			a.log.Warn("刚提交过认证，%s 内不重复提交（门户会强制注销并冷却）", minLoginGap)
