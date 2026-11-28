@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"runtime"
+	"strings"
 	"sync"
 
 	"github.com/jchv/go-webview2"
@@ -96,6 +97,14 @@ func runUI(a *App) {
 	_ = w.Bind("save", func(payload string) (string, error) {
 		return a.saveFromUI(payload), nil
 	})
+	// 密码只在打开设置时按需取，不进每秒轮询的 state 快照
+	_ = w.Bind("password", func() (string, error) {
+		return a.Config().Password, nil
+	})
+	_ = w.Bind("checkUpdate", func() (string, error) {
+		a.CheckForUpdate(true)
+		return "", nil
+	})
 	_ = w.Bind("drag", func() (string, error) {
 		dragWindow(hwnd)
 		return "", nil
@@ -120,6 +129,6 @@ func runUI(a *App) {
 		return "", nil
 	})
 
-	w.SetHtml(indexHTML)
+	w.SetHtml(strings.ReplaceAll(indexHTML, "{{VERSION}}", appVersion))
 	w.Run()
 }

@@ -46,17 +46,44 @@ func (c *DrcomClient) buildURL() string {
 	)
 }
 
-// maskedURL 只用于日志：把密码换成 ***。
+// maskedURL 只用于日志：把密码和账号换成 ***。
 func (c *DrcomClient) maskedURL() string {
-	u := c.buildURL()
-	if i := strings.Index(u, "upass="); i >= 0 {
-		j := strings.Index(u[i:], "&")
-		if j < 0 {
-			return u[:i] + "upass=***"
+	return c.redact(c.buildURL())
+}
+
+var (
+	reUpassValue   = regexp.MustCompile(`(?i)upass=[^&\s"']*`)
+	reAccountValue = regexp.MustCompile(`(?i)DDDDD=[^&\s"']*`)
+	reURLCred      = regexp.MustCompile(`://[^/@\s]+@`)
+)
+
+// maskSecrets 按结构遮掉 URL 参数里的凭据。
+// 网络错误的文本里会带完整 URL，光靠调用方替换明文不够。
+func maskSecrets(s string) string {
+	s = reURLCred.ReplaceAllString(s, "://***@")
+	s = reUpassValue.ReplaceAllString(s, "upass=***")
+	s = reAccountValue.ReplaceAllString(s, "DDDDD=***")
+	return s
+}
+
+// redactValues 把明文值（含 URL 编码形式）按字面量替换。
+// 太短的值跳过，避免把日志里的普通字符全换掉。
+func redactValues(s string, values ...string) string {
+	for _, v := range values {
+		if len(v) >= 3 {
+			s = strings.ReplaceAll(s, v, "***")
 		}
-		return u[:i] + "upass=***" + u[i+j:]
 	}
-	return u
+	return s
+}
+
+// redact 给日志用：遮密码、账号，以及错误信息里带出的完整 URL。
+func (c *DrcomClient) redact(s string) string {
+	return redactValues(maskSecrets(s),
+		c.cfg.Password,
+		urlQueryEscape(c.cfg.Password),
+		c.cfg.Account,
+	)
 }
 
 func urlQueryEscape(s string) string {

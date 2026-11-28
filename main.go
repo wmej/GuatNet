@@ -97,6 +97,7 @@ func main() {
 	// 守护循环和界面各占一个线程，托盘跑在主线程
 	go a.daemon()
 	go runUI(a)
+	go a.scheduleStartupUpdateCheck()
 
 	systray.Run(a.onTrayReady, func() {})
 }
@@ -112,7 +113,7 @@ func (a *App) daemon() {
 
 		if cfg.Account == "" || cfg.Password == "" {
 			a.st.setStatus(StatusOffline)
-			a.st.setError("未设置账号")
+			a.st.setError("未设置账号或密码")
 			select {
 			case <-a.force:
 			case <-time.After(time.Duration(cfg.ProbeEverySec) * time.Second):
@@ -246,7 +247,8 @@ func (a *App) login(client *DrcomClient, probe *prober, cfg Config) {
 		res, err := client.Login()
 		switch {
 		case err != nil:
-			a.log.Error("第 %d 次认证请求失败：%v", i, err)
+			// err 是 *url.Error，文本里含完整请求 URL，必须先脱敏
+			a.log.Error("第 %d 次认证请求失败：%s", i, client.redact(err.Error()))
 			a.st.setError("认证请求失败")
 
 		case res.OK:
@@ -267,8 +269,8 @@ func (a *App) login(client *DrcomClient, probe *prober, cfg Config) {
 			return
 
 		default:
-			a.log.Warn("第 %d 次认证被拒：result=%s msg=%s", i, res.Code, res.Msg)
-			a.st.setError("认证被拒：" + res.Msg)
+			a.log.Warn("第 %d 次认证被拒：result=%s msg=%s", i, res.Code, client.redact(res.Msg))
+			a.st.setError("认证被拒：" + client.redact(res.Msg))
 		}
 
 		if i == maxLoginTry {
@@ -290,11 +292,11 @@ func (a *App) login(client *DrcomClient, probe *prober, cfg Config) {
 // saveFromUI 接收界面传来的 JSON，校验后写盘并热更新。
 func (a *App) saveFromUI(payload string) string {
 	var in struct {
-		Account   string `json:"account"`
-		Password  string `json:"password"`
-		ISP       int    `json:"isp"`
-		Gateway   string `json:"gateway"`
-		AutoStart *bool  `json:"autoStart"`
+		Account   string  `json:"account"`
+		Password  *string `json:"password"`
+		ISP       int     `json:"isp"`
+		Gateway   string  `json:"gateway"`
+		AutoStart *bool   `json:"autoStart"`
 	}
 	if err := json.Unmarshal([]byte(payload), &in); err != nil {
 		return "参数格式错误"
@@ -307,8 +309,9 @@ func (a *App) saveFromUI(payload string) string {
 	if in.Gateway != "" {
 		cfg.Gateway = in.Gateway
 	}
-	if in.Password != "" {
-		cfg.Password = in.Password
+	// 界面会回填已保存密码：空串是用户主动清空，字段缺失才表示保持原值
+	if in.Password != nil {
+		cfg.Password = *in.Password
 	}
 	cfg = normalize(cfg)
 

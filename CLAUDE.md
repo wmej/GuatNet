@@ -15,7 +15,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## 版本号
 
 - 每次改动都要升 patch 版本号（1.0.3 → 1.0.4 → …）
-- 同步两处：`ui/index.html` 关于页的「版本 x.y.z」、`installer/guatnet.iss` 的 `#define MyAppVersion`
+- 版本源是 `version.go` 的 `appVersion`，同步 `installer/guatnet.iss` 的 `#define MyAppVersion`
+- `ui/index.html` 用 `{{VERSION}}` 占位符，由 `SetHtml` 注入，不要再手写版本号
 - 产物名由 Inno 自动生成：`GuatNet-v<版本>-win-x64-setup.exe`
 
 ## 构建
@@ -29,7 +30,7 @@ ISCC.exe installer\guatnet.iss        # 输出到 dist\
 - 替换 `assets/icon.ico` 后需重生成图标资源：
   `rsrc -arch amd64 -ico assets/icon.ico -o rsrc_windows_amd64.syso`
 - `ui/index.html` 和 `assets/icon.ico` 通过 `go:embed` 编进 exe，改完必须重新 `go build` 才生效
-- 项目**没有测试套件**，编译通过即最低验证
+- 有少量单元测试：`go test ./...`；编译与测试通过是最低验证
 
 ## 架构
 
@@ -41,6 +42,7 @@ ISCC.exe installer\guatnet.iss        # 输出到 dist\
   - `go a.daemon()`：探测 → 认证 → 保活循环
   - `go runUI()`：`runtime.LockOSThread` 后创建 WebView2 窗口（窗口与消息循环必须同线程）
 - 启动时用 `Local\GuatNet-single-instance` 命名互斥量保证单实例（`singleinstance_windows.go`），第二个实例会把已有窗口叫到前台后退出
+- 启动约 30 秒后在后台检查一次 GitHub Release（`update.go`），失败静默；只提示并打开发布页，不自动下载/安装
 - 前端是单文件 `ui/index.html`，无构建步骤、无 npm 依赖
 - 跨线程共享状态只有两处，新增共享数据必须走锁：
   - `App.cfg`（`sync.RWMutex`，`Config()` / `setConfig()`）
@@ -54,7 +56,9 @@ ISCC.exe installer\guatnet.iss        # 输出到 dist\
 | 绑定 | 作用 |
 |---|---|
 | `state` | 返回 `uiState` JSON 快照（`state.go`，字段名须与 index.html 一致） |
-| `save` | 接收 JSON 保存配置，成功后立刻 `Force()` 重新认证 |
+| `save` | 接收 JSON 保存配置，成功后立刻 `Force()` 重新认证；`password` 缺失=保持，空串=清空 |
+| `password` | 按需返回已保存密码（打开设置时调用，不进每秒快照） |
+| `checkUpdate` | 手动检查 GitHub 最新 Release（只检查并提示，见 `update.go`） |
 | `reconnect` | `App.Force()` |
 | `drag` / `minimize` / `hide` / `quit` | 无边框窗口控制 |
 | `openURL` | 仅允许 `https://github.com/` 前缀 |

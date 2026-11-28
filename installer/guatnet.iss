@@ -2,7 +2,7 @@
 ; 编译：ISCC.exe installer\guatnet.iss
 
 #define MyAppName "GuatNet"
-#define MyAppVersion "1.0.5"
+#define MyAppVersion "1.0.6"
 #define MyAppExeName "guatnet.exe"
 
 [Setup]

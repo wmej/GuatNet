@@ -32,7 +32,24 @@ type AppState struct {
 
 	autoStart   bool
 	autoStartAt time.Time
+
+	updating  bool
+	updStatus updateStatus
+	updLatest string
+	updURL    string
+	updErr    string
 }
+
+// updateStatus 是检查更新的界面状态。
+type updateStatus string
+
+const (
+	updIdle      updateStatus = ""
+	updChecking  updateStatus = "checking"
+	updLatest    updateStatus = "latest"
+	updAvailable updateStatus = "available"
+	updFailed    updateStatus = "failed"
+)
 
 func newAppState() *AppState {
 	return &AppState{status: StatusOffline, logs: make([]string, 0, maxLogLines)}
@@ -91,6 +108,49 @@ func (s *AppState) setAutoStartCache(on bool) {
 	s.mu.Unlock()
 }
 
+// beginUpdateCheck 进入检查中；已有检查在跑时返回 false，避免并发请求。
+func (s *AppState) beginUpdateCheck() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.updating {
+		return false
+	}
+	s.updating = true
+	s.updStatus = updChecking
+	s.updErr = ""
+	return true
+}
+
+// finishUpdateCheck 写入检查结果。
+// 注意：调用方不要在持锁时写日志（logger 会再拿这把锁）。
+func (s *AppState) finishUpdateCheck(latest, url string, hasNewer bool, failMsg string, manual bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.updating = false
+
+	switch {
+	case failMsg != "":
+		// 启动检查失败保持静默，手动检查才把原因展示出来
+		if manual {
+			s.updStatus = updFailed
+			s.updErr = failMsg
+		} else {
+			s.updStatus = updIdle
+			s.updErr = ""
+		}
+	case hasNewer:
+		s.updStatus = updAvailable
+		s.updLatest = latest
+		s.updURL = url
+		s.updErr = ""
+	default:
+		s.updStatus = updLatest
+		s.updLatest = latest
+		s.updURL = ""
+		s.updErr = ""
+	}
+}
+
 func (s *AppState) addLog(line string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -103,17 +163,20 @@ func (s *AppState) addLog(line string) {
 
 // uiState 是发给前端的结构，字段名和 index.html 里的保持一致。
 type uiState struct {
-	Status      string   `json:"status"`
-	Account     string   `json:"account"`
-	HasPassword bool     `json:"hasPassword"`
-	Gateway     string   `json:"gateway"`
-	ISP         int      `json:"isp"`
-	UptimeSec   int64    `json:"uptimeSec"`
-	Reconnects  int      `json:"reconnects"`
-	LastError   string   `json:"lastError"`
-	Logs        []string `json:"logs"`
-	AutoStart   bool     `json:"autoStart"`
-	FirstRun    bool     `json:"firstRun"`
+	Status        string   `json:"status"`
+	Account       string   `json:"account"`
+	Gateway       string   `json:"gateway"`
+	ISP           int      `json:"isp"`
+	UptimeSec     int64    `json:"uptimeSec"`
+	Reconnects    int      `json:"reconnects"`
+	LastError     string   `json:"lastError"`
+	Logs          []string `json:"logs"`
+	AutoStart     bool     `json:"autoStart"`
+	FirstRun      bool     `json:"firstRun"`
+	UpdateStatus  string   `json:"updateStatus"`
+	UpdateVersion string   `json:"updateVersion"`
+	UpdateURL     string   `json:"updateUrl"`
+	UpdateError   string   `json:"updateError"`
 }
 
 func (s *AppState) snapshot(cfg Config) uiState {
@@ -131,16 +194,19 @@ func (s *AppState) snapshot(cfg Config) uiState {
 	copy(logs, s.logs)
 
 	return uiState{
-		Status:      string(s.status),
-		Account:     cfg.Account,
-		HasPassword: cfg.Password != "",
-		Gateway:     cfg.Gateway,
-		ISP:         cfg.ISP,
-		UptimeSec:   up,
-		Reconnects:  s.reconnects,
-		LastError:   s.lastError,
-		Logs:        logs,
-		AutoStart:   auto,
-		FirstRun:    !cfg.FirstRunDone,
+		Status:        string(s.status),
+		Account:       cfg.Account,
+		Gateway:       cfg.Gateway,
+		ISP:           cfg.ISP,
+		UptimeSec:     up,
+		Reconnects:    s.reconnects,
+		LastError:     s.lastError,
+		Logs:          logs,
+		AutoStart:     auto,
+		FirstRun:      !cfg.FirstRunDone,
+		UpdateStatus:  string(s.updStatus),
+		UpdateVersion: s.updLatest,
+		UpdateURL:     s.updURL,
+		UpdateError:   s.updErr,
 	}
 }

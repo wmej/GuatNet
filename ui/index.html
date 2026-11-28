@@ -118,6 +118,10 @@
   }
   .field input:hover{border-color:#D3D9E1}
   .field input:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(47,111,237,.12)}
+  .pwd{position:relative}
+  .pwd input{width:100%;padding-right:36px;box-sizing:border-box}
+  .pwd .pwd-eye{position:absolute;right:4px;top:4px}
+  .pwd .pwd-eye svg{width:14px;height:14px}
 
   /* 自定义下拉 */
   .readonly{
@@ -223,6 +227,16 @@
   }
   .linkbtn:hover{border-color:#BFC6D0;background:var(--soft)}
   .linkbtn svg{width:12px;height:12px;color:#8C8C8C}
+  .switchrow .linkbtn{margin-top:0;flex:0 0 auto}
+  #updState.ok{color:var(--ok)}
+  #updState.new{color:var(--blue);font-weight:600}
+  #updState.err{color:var(--err)}
+  /* 有新版本时在「设置」按钮右上角点一个小圆点 */
+  #btnSet{position:relative}
+  #btnSet.has-update::after{
+    content:"";position:absolute;top:8px;right:9px;width:6px;height:6px;
+    border-radius:50%;background:var(--err);box-shadow:0 0 0 2px #fff;
+  }
 
   /* 首次启动弹窗 */
   .modal{
@@ -297,7 +311,16 @@
     <!-- 账号设置 -->
     <div class="tab" id="tab-account">
       <div class="field"><label>账号</label><input id="fAccount" autocomplete="off" spellcheck="false" placeholder="学号 / 校园网账号"></div>
-      <div class="field"><label>密码</label><input id="fPassword" type="password" autocomplete="off"></div>
+      <div class="field"><label>密码</label>
+        <div class="pwd">
+          <input id="fPassword" type="password" autocomplete="off" placeholder="请输入密码">
+          <button type="button" class="iconbtn pwd-eye" id="btnEye" title="显示密码" aria-label="显示密码" aria-pressed="false">
+            <svg id="eyeOpen" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 8s2.3-4.2 6.2-4.2S14.2 8 14.2 8s-2.3 4.2-6.2 4.2S1.8 8 1.8 8Z"/><circle cx="8" cy="8" r="2.1"/></svg>
+            <svg id="eyeOff" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M1.8 8s2.3-4.2 6.2-4.2S14.2 8 14.2 8s-2.3 4.2-6.2 4.2S1.8 8 1.8 8Z"/><circle cx="8" cy="8" r="2.1"/><path d="M2.4 2.4l11.2 11.2"/></svg>
+          </button>
+        </div>
+        <div class="hint" id="fPasswordHint">留空保存会删除已保存的密码。</div>
+      </div>
       <div class="field"><label>运营商</label>
         <div class="sel" id="selIsp">
           <button type="button" class="selbtn" id="selIspBtn">
@@ -335,9 +358,18 @@
         </span>
         <div>
           <div class="nm">GuatNet</div>
-          <div class="ver">版本 1.0.5 · 校园网自动认证</div>
+          <div class="ver">版本 {{VERSION}} · 校园网自动认证</div>
         </div>
       </div>
+
+      <div class="switchrow" id="updRow">
+        <div class="txt">
+          <b>检查更新</b>
+          <span id="updState">尚未检查</span>
+        </div>
+        <button type="button" class="linkbtn" id="btnUpdAction" data-mode="check">检查更新</button>
+      </div>
+      <div class="hint">启动约 30 秒后自动检查一次；只检查并提示，不自动下载。</div>
 
       <div class="notice">
         <b>本程序不是学校官方软件。</b>
@@ -347,7 +379,7 @@
       <div class="about-sec">
         <b>隐私说明</b>
         <p>账号和密码只保存在本机 <code>%APPDATA%\guatnet\config.json</code>，不会上传到任何服务器，程序也没有统计、埋点或远程上报。<br>
-        运行时的网络请求只有一个方向：向你在「通用设置」里填写的校内认证网关（通常是 10.x 内网地址）提交登录参数。<br>
+        运行时的网络请求只有两类：向你在「通用设置」里填写的校内认证网关（通常是 10.x 内网地址）提交登录参数；以及启动约 30 秒后或手动点击「检查更新」时，读取 GitHub 公开 Release 的版本号和下载页地址，不上传账号、密码或使用数据。<br>
         日志文件同样只存在本机，且其中密码一律显示为 <code>***</code>。</p>
       </div>
 
@@ -385,7 +417,7 @@
       GuatNet 由在校学生个人开发，与学校、网络信息中心及运营商均无隶属或授权关系。使用前请自行判断是否符合学校的网络使用规定。
     </div>
     <p>账号和密码只保存在本机 <code>%APPDATA%\guatnet\config.json</code>，不会上传到任何服务器，程序也没有统计或远程上报。<br>
-    唯一的对外请求，是向你在「通用设置」里填写的校内认证网关提交登录参数；日志只存在本机，其中密码一律显示为 <code>***</code>。</p>
+    对外请求只有两类：向你在「通用设置」里填写的校内认证网关提交登录参数；以及检查更新时读取 GitHub 公开 Release 的版本号。日志只存在本机，其中密码一律显示为 <code>***</code>。</p>
     <div class="btns">
       <button class="act primary" id="frOk">我知道了</button>
     </div>
@@ -393,9 +425,10 @@
 </div>
 
 <script>
+const APP_VERSION = '{{VERSION}}';
 const $ = id => document.getElementById(id);
 
-/* 绑定层：Go 那边通过 Bind 暴露 window.state / reconnect / save / drag / hide / quit。
+/* 绑定层：Go 那边通过 Bind 暴露 window.state / reconnect / save / password / checkUpdate 等。
    在浏览器里单独打开本页时这些函数不存在，用空实现兜底，方便调样式。 */
 function callBinding(name, ...args){
   const fn = window[name];
@@ -406,6 +439,8 @@ const app = {
   state: () => callBinding('state'),
   reconnect: () => callBinding('reconnect'),
   save: (payload) => callBinding('save', payload),
+  password: () => callBinding('password'),
+  checkUpdate: () => callBinding('checkUpdate'),
   drag: () => callBinding('drag'),
   firstRun: () => callBinding('firstRun'),
   openURL: (u) => callBinding('openURL', u),
@@ -416,6 +451,19 @@ const app = {
 
 let dragging = false;
 let sheetOpen = false;
+let pwdFetched = false;   // 是否成功读到已保存密码
+let pwdVisible = false;
+
+function setPwdVisible(v){
+  pwdVisible = !!v;
+  $('fPassword').type = pwdVisible ? 'text' : 'password';
+  $('eyeOpen').hidden = pwdVisible;
+  $('eyeOff').hidden = !pwdVisible;
+  $('btnEye').setAttribute('aria-pressed', pwdVisible ? 'true' : 'false');
+  $('btnEye').title = pwdVisible ? '隐藏密码' : '显示密码';
+  $('btnEye').setAttribute('aria-label', pwdVisible ? '隐藏密码' : '显示密码');
+}
+$('btnEye').onclick = () => setPwdVisible(!pwdVisible);
 
 /* 拖动窗口 */
 /* 拖动窗口：标题栏 + 状态卡 + 信息区都能拖；
@@ -503,32 +551,59 @@ async function answerFirstRun(){
 $('btnRepo').onclick = () => app.openURL('https://github.com/wmej/GuatNet');
 $('frOk').onclick = () => answerFirstRun();
 
-function openSheet(){
+let sheetSeq = 0;
+
+async function openSheet(){
+  const seq = ++sheetSeq;   // 防止快速双击把两次打开的顺序搞乱
   const s = JSON.parse(_lastState || '{}');
+
   $('fAccount').value = s.account || '';
   $('fGateway').value = s.gateway || '';
   setAutoStart(s.autoStart);
-  switchTab('account');
-  $('fPassword').value = '';
-  $('fPassword').placeholder = s.hasPassword ? '已保存，留空则不修改' : '请输入密码';
   setIsp(s.isp ?? 0);
+  switchTab('account');
   $('msg').textContent = '';
+  $('msg').style.color = 'var(--err)';
+
+  pwdFetched = false;
+  let pwd = '';
+  try {
+    pwd = await app.password();
+    if (seq !== sheetSeq) return;
+    pwdFetched = true;
+  } catch (e) {
+    if (seq !== sheetSeq) return;
+  }
+
+  $('fPassword').value = pwd || '';
+  setPwdVisible(false);
+  $('fPasswordHint').textContent = pwdFetched
+    ? '留空保存会删除已保存的密码。'
+    : '读取已保存密码失败，留空保存将保持原密码。';
+
   $('sheet').classList.add('open');
   sheetOpen = true;
 }
 function closeSheet(){
   $('sheet').classList.remove('open');
   sheetOpen = false;
+  // 别让明文密码在 DOM 里停留
+  $('fPassword').value = '';
+  pwdFetched = false;
+  setPwdVisible(false);
 }
 
 $('btnSave').onclick = async () => {
   const payload = {
     account: $('fAccount').value.trim(),
-    password: $('fPassword').value,
     autoStart: autoStartOn,
     gateway: $('fGateway').value.trim(),
     isp: currentIsp
   };
+  // 读到过原密码就如实提交（空串 = 清空）；读取失败且没输入则不带，避免误删
+  if (pwdFetched || $('fPassword').value !== '') {
+    payload.password = $('fPassword').value;
+  }
   try {
     const err = await app.save(JSON.stringify(payload));
     if (err) { $('msg').textContent = err; return; }
@@ -588,7 +663,54 @@ function render(s){
     return '<div class="' + cls + '"><span class="t">' + m[1] + '</span>  ' + m[3] + '</div>';
   }).join('');
   if (atBottom) box.scrollTop = box.scrollHeight;
+
+  renderUpdate(s);
 }
+
+/* 关于页的检查更新状态 */
+let _updUrl = '';
+
+function renderUpdate(s){
+  const status = s.updateStatus || '';
+  const st = $('updState');
+  const btn = $('btnUpdAction');
+  let text = '尚未检查', cls = '', label = '检查更新', mode = 'check', disabled = false;
+  _updUrl = '';
+
+  switch (status) {
+    case 'checking':
+      text = '正在检查…'; label = '检查中…'; disabled = true; break;
+    case 'latest':
+      text = '已是最新版本（v' + APP_VERSION + '）'; cls = 'ok';
+      label = '重新检查'; break;
+    case 'available':
+      text = '发现新版本 v' + (s.updateVersion || ''); cls = 'new';
+      label = '前往下载'; mode = 'open'; _updUrl = s.updateUrl || ''; break;
+    case 'failed':
+      text = '检查失败：' + (s.updateError || '网络不可用'); cls = 'err';
+      label = '重试'; break;
+  }
+
+  st.textContent = text;
+  st.className = cls;
+  btn.textContent = label;
+  btn.dataset.mode = mode;
+  btn.disabled = disabled;
+  $('btnSet').classList.toggle('has-update', status === 'available');
+}
+
+$('btnUpdAction').onclick = () => {
+  const btn = $('btnUpdAction');
+  if (btn.dataset.mode === 'open') {
+    if (_updUrl) app.openURL(_updUrl);
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '检查中…';
+  $('updState').textContent = '正在检查…';
+  $('updState').className = '';
+  app.checkUpdate().catch(() => {});
+};
 
 async function tick(){
   try {
