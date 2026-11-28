@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -38,7 +39,10 @@ func TestFetchLatestReleaseMock(t *testing.T) {
 		if r.Header.Get("Accept") != "application/vnd.github+json" {
 			t.Errorf("Accept = %q", r.Header.Get("Accept"))
 		}
-		_, _ = w.Write([]byte(`{"tag_name":"v9.9.9","html_url":"https://github.com/wmej/GuatNet/releases/tag/v9.9.9"}`))
+		_, _ = w.Write([]byte(`{"tag_name":"v9.9.9","assets":[
+			{"name":"GuatNet-v9.9.9-win-x64-portable.exe","browser_download_url":"https://github.com/wmej/GuatNet/releases/download/v9.9.9/GuatNet-v9.9.9-win-x64-portable.exe"},
+			{"name":"GuatNet-v9.9.9-win-x64-setup.exe","browser_download_url":"https://github.com/wmej/GuatNet/releases/download/v9.9.9/GuatNet-v9.9.9-win-x64-setup.exe"}
+		]}`))
 	}))
 	defer srv.Close()
 
@@ -50,11 +54,54 @@ func TestFetchLatestReleaseMock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if rel.TagName != "v9.9.9" || !strings.HasPrefix(rel.HTMLURL, "https://github.com/") {
+	if rel.TagName != "v9.9.9" {
 		t.Fatalf("解析结果异常：%+v", rel)
+	}
+	name, downloadURL := pickSetupAsset(rel)
+	if name != "GuatNet-v9.9.9-win-x64-setup.exe" || !strings.HasPrefix(downloadURL, "https://github.com/") {
+		t.Fatalf("未选中安装包：name=%q url=%q", name, downloadURL)
 	}
 	if !isNewerVersion("1.0.6", rel.TagName) {
 		t.Fatal("v9.9.9 应判定为新版本")
+	}
+}
+
+func TestPickSetupAsset(t *testing.T) {
+	okURL := "https://github.com/wmej/GuatNet/releases/download/v1/GuatNet-v1-win-x64-setup.exe"
+	cases := []struct {
+		name string
+		rel  releaseInfo
+		want string
+	}{
+		{"无资产", releaseInfo{TagName: "v1.0.0"}, ""},
+		{
+			"只有绿色版",
+			releaseInfo{Assets: []releaseAsset{{
+				Name: "GuatNet-v1-win-x64-portable.exe", BrowserDownloadURL: okURL,
+			}}},
+			"",
+		},
+		{
+			"非白名单地址",
+			releaseInfo{Assets: []releaseAsset{{
+				Name: "GuatNet-v1-win-x64-setup.exe", BrowserDownloadURL: "https://evil.example/setup.exe",
+			}}},
+			"",
+		},
+		{
+			"安装包正常",
+			releaseInfo{Assets: []releaseAsset{{
+				Name: "GuatNet-v1-win-x64-setup.exe", BrowserDownloadURL: okURL,
+			}}},
+			"GuatNet-v1-win-x64-setup.exe",
+		},
+	}
+
+	for _, c := range cases {
+		got, _ := pickSetupAsset(c.rel)
+		if got != c.want {
+			t.Errorf("%s: pickSetupAsset = %q, want %q", c.name, got, c.want)
+		}
 	}
 }
 
@@ -70,6 +117,40 @@ func TestFetchLatestRelease403(t *testing.T) {
 
 	if _, err := fetchLatestRelease(); err == nil || !strings.Contains(err.Error(), "403") {
 		t.Fatalf("应返回 403 错误，实际：%v", err)
+	}
+}
+
+func TestDownloadToTemp(t *testing.T) {
+	payload := make([]byte, 1<<20+1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(payload)
+	}))
+	defer srv.Close()
+
+	st := newAppState()
+	path, err := downloadToTemp(srv.URL+"/GuatNet-v1-win-x64-setup.exe", st)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(path)
+
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Size() != int64(len(payload)) {
+		t.Fatalf("大小 = %d, want %d", fi.Size(), len(payload))
+	}
+}
+
+func TestDownloadToTempRejectsTinyFile(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte("not an installer"))
+	}))
+	defer srv.Close()
+
+	if _, err := downloadToTemp(srv.URL+"/tiny-setup.exe", newAppState()); err == nil {
+		t.Fatal("过小的文件应被拒绝")
 	}
 }
 

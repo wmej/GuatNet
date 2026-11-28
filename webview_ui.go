@@ -110,6 +110,10 @@ func runUI(a *App) {
 		a.CheckForUpdate(true)
 		return "", nil
 	})
+	_ = w.Bind("downloadUpdate", func() (string, error) {
+		a.StartUpdateDownload()
+		return "", nil
+	})
 	_ = w.Bind("drag", func() (string, error) {
 		dragWindow(hwnd)
 		return "", nil

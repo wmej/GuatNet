@@ -42,7 +42,7 @@ ISCC.exe installer\guatnet.iss        # 输出到 dist\
   - `go a.daemon()`：探测 → 认证 → 保活循环
   - `go runUI()`：`runtime.LockOSThread` 后创建 WebView2 窗口（窗口与消息循环必须同线程）
 - 启动时用 `Local\GuatNet-single-instance` 命名互斥量保证单实例（`singleinstance_windows.go`），第二个实例会把已有窗口叫到前台后退出
-- 启动约 30 秒后在后台检查一次 GitHub Release（`update.go`），失败静默；只提示并打开发布页，不自动下载/安装
+- 启动约 30 秒后在后台检查一次 GitHub Release（`update.go`），失败静默；启动自动检查发现新版时前端弹一次窗（每次启动最多一次），手动检查只更新关于页；用户确认后应用内下载 setup 并启动安装程序，不打开浏览器
 - 前端是单文件 `ui/index.html`，无构建步骤、无 npm 依赖
 - 跨线程共享状态只有两处，新增共享数据必须走锁：
   - `App.cfg`（`sync.RWMutex`，`Config()` / `setConfig()`）
@@ -58,7 +58,8 @@ ISCC.exe installer\guatnet.iss        # 输出到 dist\
 | `state` | 返回 `uiState` JSON 快照（`state.go`，字段名须与 index.html 一致） |
 | `save` | 接收 JSON 保存配置，成功后立刻 `Force()` 重新认证；`password` 缺失=保持，空串=清空 |
 | `password` | 按需返回已保存密码（打开设置时调用，不进每秒快照） |
-| `checkUpdate` | 手动检查 GitHub 最新 Release（只检查并提示，见 `update.go`） |
+| `checkUpdate` | 手动检查 GitHub 最新 Release |
+| `downloadUpdate` | 下载 setup 到临时目录，成功后启动安装程序并退出（见 `update.go`） |
 | `reconnect` | `App.Force()` |
 | `drag` / `minimize` / `hide` / `quit` | 无边框窗口控制 |
 | `openURL` | 仅允许 `https://github.com/` 前缀 |

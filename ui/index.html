@@ -227,6 +227,7 @@
   }
   .linkbtn:hover{border-color:#BFC6D0;background:var(--soft)}
   .linkbtn svg{width:12px;height:12px;color:#8C8C8C}
+  .about-by{font-size:10.5px;color:#A3ABB6;text-align:center;padding:6px 0 2px;letter-spacing:.06em}
   .switchrow .linkbtn{margin-top:0;flex:0 0 auto}
   #updState.ok{color:var(--ok)}
   #updState.new{color:var(--blue);font-weight:600}
@@ -369,7 +370,7 @@
         </div>
         <button type="button" class="linkbtn" id="btnUpdAction" data-mode="check">检查更新</button>
       </div>
-      <div class="hint">启动约 30 秒后自动检查一次；只检查并提示，不自动下载。</div>
+      <div class="hint">启动约 30 秒后自动检查一次；更新需要你点击后才会下载并启动安装程序。</div>
 
       <div class="notice">
         <b>本程序不是学校官方软件。</b>
@@ -379,7 +380,7 @@
       <div class="about-sec">
         <b>隐私说明</b>
         <p>账号和密码只保存在本机 <code>%APPDATA%\guatnet\config.json</code>，不会上传到任何服务器，程序也没有统计、埋点或远程上报。<br>
-        运行时的网络请求只有两类：向你在「通用设置」里填写的校内认证网关（通常是 10.x 内网地址）提交登录参数；以及启动约 30 秒后或手动点击「检查更新」时，读取 GitHub 公开 Release 的版本号和下载页地址，不上传账号、密码或使用数据。<br>
+        运行时的网络请求只有两类：向你在「通用设置」里填写的校内认证网关（通常是 10.x 内网地址）提交登录参数；以及启动约 30 秒后或手动点击「检查更新」时，读取 GitHub 公开 Release 的版本信息；确认更新时从 GitHub 下载安装包。不上传账号、密码或使用数据。<br>
         日志文件同样只存在本机，且其中密码一律显示为 <code>***</code>。</p>
       </div>
 
@@ -397,6 +398,8 @@
         <b>免责</b>
         <p>本程序按「现状」提供，不对可用性作任何担保。因使用本程序产生的一切后果由使用者自行承担。</p>
       </div>
+
+      <div class="about-by">By wmej</div>
     </div>
 
     <div class="msg" id="msg"></div>
@@ -417,9 +420,22 @@
       GuatNet 由在校学生个人开发，与学校、网络信息中心及运营商均无隶属或授权关系。使用前请自行判断是否符合学校的网络使用规定。
     </div>
     <p>账号和密码只保存在本机 <code>%APPDATA%\guatnet\config.json</code>，不会上传到任何服务器，程序也没有统计或远程上报。<br>
-    对外请求只有两类：向你在「通用设置」里填写的校内认证网关提交登录参数；以及检查更新时读取 GitHub 公开 Release 的版本号。日志只存在本机，其中密码一律显示为 <code>***</code>。</p>
+    对外请求只有两类：向你在「通用设置」里填写的校内认证网关提交登录参数；以及检查更新、下载更新时访问 GitHub 公开 Release。日志只存在本机，其中密码一律显示为 <code>***</code>。</p>
     <div class="btns">
       <button class="act primary" id="frOk">我知道了</button>
+    </div>
+  </div>
+</div>
+
+<!-- 发现新版本：启动自动检查时才弹，每次启动最多一次 -->
+<div class="modal" id="updateModal">
+  <div class="box">
+    <h3>发现新版本</h3>
+    <p id="updMsg">当前版本 <code>v{{VERSION}}</code>，最新版本 <code id="updNewVer">v—</code>。<br>
+    更新只替换程序本身，不会改动你的账号和配置。</p>
+    <div class="btns">
+      <button class="act ghost" id="updLater">稍后</button>
+      <button class="act primary" id="updGo">下载并安装</button>
     </div>
   </div>
 </div>
@@ -441,6 +457,7 @@ const app = {
   save: (payload) => callBinding('save', payload),
   password: () => callBinding('password'),
   checkUpdate: () => callBinding('checkUpdate'),
+  downloadUpdate: () => callBinding('downloadUpdate'),
   drag: () => callBinding('drag'),
   firstRun: () => callBinding('firstRun'),
   openURL: (u) => callBinding('openURL', u),
@@ -516,7 +533,11 @@ function closeIsp(){ $('selIsp').classList.remove('open'); $('selIspMenu').hidde
 
 $('selIspBtn').onclick = e => { e.stopPropagation(); $('selIspMenu').hidden ? openIsp() : closeIsp(); };
 document.addEventListener('click', e => { if (!e.target.closest('#selIsp')) closeIsp(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeIsp(); });
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  closeIsp();
+  $('updateModal').classList.remove('show');
+});
 
 /* ---------- 设置分类 ---------- */
 function switchTab(name){
@@ -668,14 +689,14 @@ function render(s){
 }
 
 /* 关于页的检查更新状态 */
-let _updUrl = '';
+let updatePopupShown = false;   // 每次启动最多弹一次
 
 function renderUpdate(s){
   const status = s.updateStatus || '';
   const st = $('updState');
   const btn = $('btnUpdAction');
+  const pct = s.updateProgress > 0 ? ' ' + s.updateProgress + '%' : '';
   let text = '尚未检查', cls = '', label = '检查更新', mode = 'check', disabled = false;
-  _updUrl = '';
 
   switch (status) {
     case 'checking':
@@ -685,10 +706,20 @@ function renderUpdate(s){
       label = '重新检查'; break;
     case 'available':
       text = '发现新版本 v' + (s.updateVersion || ''); cls = 'new';
-      label = '前往下载'; mode = 'open'; _updUrl = s.updateUrl || ''; break;
+      label = '下载并安装'; mode = 'download'; break;
+    case 'downloading':
+      text = '正在下载更新…' + pct; cls = 'new';
+      label = '下载中…'; disabled = true; break;
     case 'failed':
-      text = '检查失败：' + (s.updateError || '网络不可用'); cls = 'err';
-      label = '重试'; break;
+      if (s.updateFailStage === 'download') {
+        text = s.updateError || '下载失败';
+        label = '重试下载';
+      } else {
+        text = '检查失败：' + (s.updateError || '未知错误');
+        label = '重试';
+      }
+      cls = 'err';
+      break;
   }
 
   st.textContent = text;
@@ -697,12 +728,41 @@ function renderUpdate(s){
   btn.dataset.mode = mode;
   btn.disabled = disabled;
   $('btnSet').classList.toggle('has-update', status === 'available');
+
+  // 只有启动自动检查发现新版才弹窗；手动检查时用户已经在关于页看到了
+  if (status === 'available' && s.updateAuto && !updatePopupShown) {
+    updatePopupShown = true;
+    $('updNewVer').textContent = 'v' + (s.updateVersion || '');
+    $('updateModal').classList.add('show');
+  }
+
+  // 弹窗开着时，跟随下载进度/失败更新内容
+  const modal = $('updateModal');
+  if (modal.classList.contains('show')) {
+    const msg = $('updMsg');
+    if (status === 'downloading') {
+      msg.textContent = '正在下载更新…' + pct;
+      $('updGo').textContent = '下载中…';
+      $('updGo').disabled = true;
+    } else if (status === 'failed') {
+      msg.textContent = s.updateError || '下载失败';
+      $('updGo').textContent = '重试';
+      $('updGo').disabled = false;
+    } else if (status === 'available') {
+      msg.textContent = '当前版本 v' + APP_VERSION + '，最新版本 v' + (s.updateVersion || '') + '。';
+      $('updGo').textContent = '下载并安装';
+      $('updGo').disabled = false;
+    }
+  }
 }
+
+$('updLater').onclick = () => $('updateModal').classList.remove('show');
+$('updGo').onclick = () => { app.downloadUpdate().catch(() => {}); };
 
 $('btnUpdAction').onclick = () => {
   const btn = $('btnUpdAction');
-  if (btn.dataset.mode === 'open') {
-    if (_updUrl) app.openURL(_updUrl);
+  if (btn.dataset.mode === 'download') {
+    app.downloadUpdate().catch(() => {});
     return;
   }
   btn.disabled = true;

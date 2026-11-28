@@ -33,22 +33,26 @@ type AppState struct {
 	autoStart   bool
 	autoStartAt time.Time
 
-	updating  bool
-	updStatus updateStatus
-	updLatest string
-	updURL    string
-	updErr    string
+	updating     bool
+	updStatus    updateStatus
+	updLatest    string
+	updURL       string // 安装包下载地址
+	updErr       string
+	updAuto      bool   // 本次结果是否来自启动自动检查（决定要不要弹窗）
+	updProgress  int    // 下载进度 0–100，0 表示未知
+	updFailStage string // "check" 或 "download"，决定失败文案
 }
 
 // updateStatus 是检查更新的界面状态。
 type updateStatus string
 
 const (
-	updIdle      updateStatus = ""
-	updChecking  updateStatus = "checking"
-	updLatest    updateStatus = "latest"
-	updAvailable updateStatus = "available"
-	updFailed    updateStatus = "failed"
+	updIdle        updateStatus = ""
+	updChecking    updateStatus = "checking"
+	updLatest      updateStatus = "latest"
+	updAvailable   updateStatus = "available"
+	updDownloading updateStatus = "downloading"
+	updFailed      updateStatus = "failed"
 )
 
 func newAppState() *AppState {
@@ -112,7 +116,7 @@ func (s *AppState) setAutoStartCache(on bool) {
 func (s *AppState) beginUpdateCheck() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.updating {
+	if s.updating || s.updStatus == updDownloading {
 		return false
 	}
 	s.updating = true
@@ -127,6 +131,7 @@ func (s *AppState) finishUpdateCheck(latest, url string, hasNewer bool, failMsg 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.updating = false
+	s.updAuto = !manual
 
 	switch {
 	case failMsg != "":
@@ -134,6 +139,7 @@ func (s *AppState) finishUpdateCheck(latest, url string, hasNewer bool, failMsg 
 		if manual {
 			s.updStatus = updFailed
 			s.updErr = failMsg
+			s.updFailStage = "check"
 		} else {
 			s.updStatus = updIdle
 			s.updErr = ""
@@ -143,12 +149,54 @@ func (s *AppState) finishUpdateCheck(latest, url string, hasNewer bool, failMsg 
 		s.updLatest = latest
 		s.updURL = url
 		s.updErr = ""
+		s.updProgress = 0
 	default:
 		s.updStatus = updLatest
 		s.updLatest = latest
 		s.updURL = ""
 		s.updErr = ""
+		s.updProgress = 0
 	}
+}
+
+// beginUpdateDownload 进入下载状态；已有下载在跑时返回 false。
+func (s *AppState) beginUpdateDownload() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.updStatus == updDownloading {
+		return false
+	}
+	s.updStatus = updDownloading
+	s.updProgress = 0
+	s.updErr = ""
+	return true
+}
+
+func (s *AppState) setUpdateProgress(p int) {
+	s.mu.Lock()
+	s.updProgress = p
+	s.mu.Unlock()
+}
+
+// finishUpdateDownload 记录下载失败；成功时进程会很快退出，不需要改状态。
+func (s *AppState) finishUpdateDownload(failMsg string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if failMsg == "" {
+		s.updProgress = 100
+		return
+	}
+	s.updStatus = updFailed
+	s.updErr = failMsg
+	s.updFailStage = "download"
+	s.updProgress = 0
+}
+
+// updateDownloadURL 返回检查结果里的安装包地址。
+func (s *AppState) updateDownloadURL() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.updURL
 }
 
 func (s *AppState) addLog(line string) {
@@ -163,20 +211,23 @@ func (s *AppState) addLog(line string) {
 
 // uiState 是发给前端的结构，字段名和 index.html 里的保持一致。
 type uiState struct {
-	Status        string   `json:"status"`
-	Account       string   `json:"account"`
-	Gateway       string   `json:"gateway"`
-	ISP           int      `json:"isp"`
-	UptimeSec     int64    `json:"uptimeSec"`
-	Reconnects    int      `json:"reconnects"`
-	LastError     string   `json:"lastError"`
-	Logs          []string `json:"logs"`
-	AutoStart     bool     `json:"autoStart"`
-	FirstRun      bool     `json:"firstRun"`
-	UpdateStatus  string   `json:"updateStatus"`
-	UpdateVersion string   `json:"updateVersion"`
-	UpdateURL     string   `json:"updateUrl"`
-	UpdateError   string   `json:"updateError"`
+	Status          string   `json:"status"`
+	Account         string   `json:"account"`
+	Gateway         string   `json:"gateway"`
+	ISP             int      `json:"isp"`
+	UptimeSec       int64    `json:"uptimeSec"`
+	Reconnects      int      `json:"reconnects"`
+	LastError       string   `json:"lastError"`
+	Logs            []string `json:"logs"`
+	AutoStart       bool     `json:"autoStart"`
+	FirstRun        bool     `json:"firstRun"`
+	UpdateStatus    string   `json:"updateStatus"`
+	UpdateVersion   string   `json:"updateVersion"`
+	UpdateURL       string   `json:"updateUrl"`
+	UpdateError     string   `json:"updateError"`
+	UpdateAuto      bool     `json:"updateAuto"`
+	UpdateProgress  int      `json:"updateProgress"`
+	UpdateFailStage string   `json:"updateFailStage"`
 }
 
 func (s *AppState) snapshot(cfg Config) uiState {
@@ -194,19 +245,22 @@ func (s *AppState) snapshot(cfg Config) uiState {
 	copy(logs, s.logs)
 
 	return uiState{
-		Status:        string(s.status),
-		Account:       cfg.Account,
-		Gateway:       cfg.Gateway,
-		ISP:           cfg.ISP,
-		UptimeSec:     up,
-		Reconnects:    s.reconnects,
-		LastError:     s.lastError,
-		Logs:          logs,
-		AutoStart:     auto,
-		FirstRun:      !cfg.FirstRunDone,
-		UpdateStatus:  string(s.updStatus),
-		UpdateVersion: s.updLatest,
-		UpdateURL:     s.updURL,
-		UpdateError:   s.updErr,
+		Status:          string(s.status),
+		Account:         cfg.Account,
+		Gateway:         cfg.Gateway,
+		ISP:             cfg.ISP,
+		UptimeSec:       up,
+		Reconnects:      s.reconnects,
+		LastError:       s.lastError,
+		Logs:            logs,
+		AutoStart:       auto,
+		FirstRun:        !cfg.FirstRunDone,
+		UpdateStatus:    string(s.updStatus),
+		UpdateVersion:   s.updLatest,
+		UpdateURL:       s.updURL,
+		UpdateError:     s.updErr,
+		UpdateAuto:      s.updAuto,
+		UpdateProgress:  s.updProgress,
+		UpdateFailStage: s.updFailStage,
 	}
 }
